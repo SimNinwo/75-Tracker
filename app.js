@@ -278,7 +278,14 @@ async function toggleTask(taskId) {
   let rec = await DB.getDay(day);
   if (!rec) rec = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
   rec.tasks[taskId] = !rec.tasks[taskId];
+  // save the updated tasks first
   await DB.putDay(rec);
+  // recompute completion (photo check is async) and persist if changed
+  const completed = await isDayComplete(day);
+  if (rec.completed !== completed) {
+    rec.completed = completed;
+    await DB.putDay(rec);
+  }
   await renderAll();
 }
 
@@ -287,6 +294,8 @@ async function handlePhotoUpload(file) {
   await DB.putPhoto(day, file);
   let rec = await DB.getDay(day);
   if (!rec) rec = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
+  // after saving the photo, compute whether the day is now complete
+  rec.completed = await isDayComplete(day);
   await DB.putDay(rec);
   await renderAll();
 }
@@ -477,3 +486,35 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+/* ---------- test helpers (dev only) ---------- */
+// Simulate marking all tasks and adding a photo for a day, then log results.
+// Use from the browser console: `await runCompletionTest(day)`
+async function runCompletionTest(day = state.currentDay) {
+  // ensure there's a base record
+  const base = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
+  await DB.putDay(base);
+
+  // mark all non-photo tasks as done
+  const tierTasks = currentTier().tasks.map((t) => t.id);
+  let rec = await DB.getDay(day);
+  tierTasks.forEach((id) => {
+    if (id !== 'photo') rec.tasks[id] = true;
+  });
+  await DB.putDay(rec);
+  console.log('After marking tasks, isDayComplete:', await isDayComplete(day));
+
+  // add a tiny fake blob as the photo
+  const blob = new Blob(['fake-photo'], { type: 'image/png' });
+  await DB.putPhoto(day, blob);
+
+  // recompute completion and persist
+  rec = await DB.getDay(day);
+  rec.completed = await isDayComplete(day);
+  await DB.putDay(rec);
+
+  console.log('After adding photo, isDayComplete:', await isDayComplete(day), 'rec.completed:', rec.completed);
+  return { day, completed: rec.completed };
+}
+
+window.runCompletionTest = runCompletionTest;
