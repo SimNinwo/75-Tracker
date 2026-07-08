@@ -67,7 +67,7 @@ function dateForDay(dayNum) {
 }
 
 function currentTier() {
-  return TIERS[state.tier];
+  return window.AppView.currentTier();
 }
 
 function emptyTasks() {
@@ -95,29 +95,19 @@ async function boot() {
   state.failedAtDay = settings.failedAtDay || null;
 
   await recomputeStatus();
-  showApp();
+  await showApp();
 }
 
 function showOnboarding() {
-  document.getElementById('onboard').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  renderTierCards();
+  window.AppView.showOnboarding();
 }
 
-function showApp() {
-  document.getElementById('onboard').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  applyTierColor();
-  renderAll();
+async function showApp() {
+  await window.AppView.showApp();
 }
 
 function applyTierColor() {
-  document.documentElement.style.setProperty('--accent', currentTier().color);
-  document.documentElement.style.setProperty('--accent-soft', hexToRgba(currentTier().color, 0.16));
-}
-function hexToRgba(hex, a) {
-  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${a})`;
+  window.AppView.applyTierColor();
 }
 
 /* ---------- status / streak logic ---------- */
@@ -129,266 +119,27 @@ async function computeStreak() {
   return window.TrackerService.computeStreak();
 }
 
-/* ---------- rendering ---------- */
-async function renderAll() {
-  document.getElementById('tierEyebrow').textContent = currentTier().label + ' mode';
-  document.getElementById('dayNum').textContent = Math.min(state.currentDay, TOTAL_DAYS);
-
-  const failBanner = document.getElementById('failBanner');
-  if (state.status === 'failed') {
-    failBanner.classList.remove('hidden');
-    document.getElementById('failDay').textContent = `Day ${state.failedAtDay}`;
-  } else {
-    failBanner.classList.add('hidden');
-  }
-
-  const streak = await computeStreak();
-  document.getElementById('streakNum').textContent = streak;
-
-  await renderChain();
-  await renderToday();
-  await renderCalendar();
-  await renderGallery();
-}
-
-async function renderChain() {
-  const chain = document.getElementById('chain');
-  chain.innerHTML = '';
-  for (let d = 1; d <= TOTAL_DAYS; d++) {
-    const cell = document.createElement('div');
-    cell.className = 'chain-cell';
-    const isToday = d === state.currentDay && state.status === 'active';
-    const complete = await isDayComplete(d);
-    
-    if (d < state.currentDay || (d === state.currentDay && state.status !== 'active')) {
-      // Past or failed day
-      cell.classList.add(complete ? 'done' : 'missed');
-      if (complete) {
-        const rec = await window.TrackerRepository.getDay(d);
-        if (rec && rec.completed) {
-          cell.classList.add('completed-badge');
-          cell.setAttribute('title', 'All tasks & photo completed');
-        }
-      }
-    } else if (isToday && complete) {
-      // Today AND all tasks are complete
-      cell.classList.add('done');
-      const rec = await window.TrackerRepository.getDay(d);
-      if (rec && rec.completed) {
-        cell.classList.add('completed-badge');
-        cell.setAttribute('title', 'All tasks & photo completed');
-      }
-    } else if (isToday) {
-      // Today but not yet complete
-      cell.classList.add('today');
-    }
-    chain.appendChild(cell);
-  }
-}
-
-async function renderToday() {
-  const taskList = document.getElementById('taskList');
-  taskList.innerHTML = '';
-
-  if (state.status !== 'active') {
-    taskList.innerHTML = state.status === 'completed'
-      ? '<p style="color:var(--muted);font-size:14px;">You completed the full run. Start a new one from Settings whenever you\'re ready.</p>'
-      : '<p style="color:var(--muted);font-size:14px;">Restart the run to keep logging today\'s tasks.</p>';
-    document.querySelector('.photo-card').style.display = 'none';
-    return;
-  }
-  document.querySelector('.photo-card').style.display = '';
-
-  const day = state.currentDay;
-  let rec = await DB.getDay(day);
-  if (!rec) {
-    rec = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
-  }
-  state.todayRecord = rec;
-
-  currentTier().tasks.filter((t) => t.id !== 'photo').forEach((task) => {
-    const li = document.createElement('li');
-    li.className = 'task-item' + (rec.tasks[task.id] ? ' checked' : '');
-    li.dataset.taskId = task.id;
-    li.innerHTML = `<span class="task-check">✓</span><span class="task-label">${task.label}</span>`;
-    li.addEventListener('click', () => toggleTask(task.id));
-    taskList.appendChild(li);
-  });
-
-  const photo = await DB.getPhoto(day);
-  const preview = document.getElementById('photoPreview');
-  const placeholder = document.getElementById('photoPlaceholder');
-  const status = document.getElementById('photoStatus');
-  if (photo) {
-    preview.src = URL.createObjectURL(photo.blob);
-    preview.classList.remove('hidden');
-    placeholder.classList.add('hidden');
-    status.textContent = 'Saved';
-  } else {
-    preview.classList.add('hidden');
-    placeholder.classList.remove('hidden');
-    status.textContent = 'Not taken yet';
-  }
-}
-
-async function toggleTask(taskId) {
-  const day = state.currentDay;
-  let rec = await DB.getDay(day);
-  if (!rec) rec = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
-  rec.tasks[taskId] = !rec.tasks[taskId];
-  // save the updated tasks first
-  await DB.putDay(rec);
-  // recompute completion (photo check is async) and persist if changed
-  const completed = await isDayComplete(day);
-  if (rec.completed !== completed) {
-    rec.completed = completed;
-    await DB.putDay(rec);
-  }
-  await renderAll();
-}
-
-async function handlePhotoUpload(file) {
-  const day = state.currentDay;
-  await DB.putPhoto(day, file);
-  let rec = await DB.getDay(day);
-  if (!rec) rec = { day, date: isoDateOnly(new Date()), tasks: emptyTasks(), completed: false };
-  // after saving the photo, compute whether the day is now complete
-  rec.completed = await isDayComplete(day);
-  await DB.putDay(rec);
-  await renderAll();
-}
-
-async function renderCalendar() {
-  const grid = document.getElementById('calendarGrid');
-  grid.innerHTML = '';
-  for (let d = 1; d <= TOTAL_DAYS; d++) {
-    const cell = document.createElement('button');
-    cell.className = 'cal-cell';
-    cell.textContent = d;
-    const isToday = d === state.currentDay && state.status === 'active';
-    const complete = await isDayComplete(d);
-    
-    if (d > state.currentDay || (isToday && !complete)) {
-      // Future days or today (incomplete)
-      if (d === state.currentDay) cell.classList.add('today');
-      else cell.classList.add('future');
-    } else {
-      // Past days OR today (complete)
-      cell.classList.add(complete ? 'done' : 'missed');
-      const photo = await window.TrackerRepository.getPhoto(d);
-      if (photo) {
-        const dot = document.createElement('span');
-        dot.className = 'dot';
-        cell.appendChild(dot);
-      }
-    }
-    if (d <= state.currentDay) {
-      cell.addEventListener('click', () => openDayModal(d));
-    }
-    grid.appendChild(cell);
-  }
-}
-
-async function openDayModal(day) {
-  const rec = await DB.getDay(day);
-  const photo = await DB.getPhoto(day);
-  document.getElementById('modalDay').textContent = `Day ${day}`;
-  document.getElementById('modalDate').textContent = dateForDay(day).toDateString();
-
-  const modalPhoto = document.getElementById('modalPhoto');
-  if (photo) {
-    modalPhoto.src = URL.createObjectURL(photo.blob);
-    modalPhoto.classList.remove('hidden');
-  } else {
-    modalPhoto.classList.add('hidden');
-  }
-
-  const list = document.getElementById('modalTasks');
-  list.innerHTML = '';
-  currentTier().tasks.forEach((task) => {
-    const li = document.createElement('li');
-    let done;
-    if (task.id === 'photo') done = !!photo;
-    else done = !!(rec && rec.tasks[task.id]);
-    li.className = done ? 'done' : 'no';
-    li.textContent = task.label;
-    list.appendChild(li);
-  });
-
-  document.getElementById('dayModal').classList.remove('hidden');
-}
-
-async function renderGallery() {
-  const photos = await DB.getAllPhotos();
-  const grid = document.getElementById('galleryGrid');
-  const empty = document.getElementById('galleryEmpty');
-  grid.innerHTML = '';
-  if (photos.length === 0) {
-    empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
-  photos.forEach((p) => {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(p.blob);
-    img.addEventListener('click', () => openDayModal(p.day));
-    grid.appendChild(img);
-  });
-}
-
-/* ---------- tier selection / onboarding ---------- */
-function renderTierCards() {
-  const wrap = document.getElementById('tierCards');
-  wrap.innerHTML = '';
-  let selected = null;
-  Object.entries(TIERS).forEach(([key, tier]) => {
-    const card = document.createElement('button');
-    card.className = 'tier-card';
-    card.style.setProperty('--tier-color', tier.color);
-    card.innerHTML = `
-      <div class="tier-card-top">
-        <span class="tier-name">${tier.label}</span>
-        <span class="tier-dot"></span>
-      </div>
-      <p class="tier-desc">${tier.desc}</p>
-    `;
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.tier-card').forEach((c) => c.classList.remove('selected'));
-      card.classList.add('selected');
-      selected = key;
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('startBtn').dataset.tier = key;
-    });
-    wrap.appendChild(card);
-  });
-}
-
 async function startRun(tier) {
   await window.TrackerService.startRun(tier);
-  showApp();
+  await window.AppView.showApp();
 }
 
 async function restartRun() {
   await window.TrackerService.restartRun();
-  showApp();
+  await window.AppView.showApp();
 }
 
 async function wipeEverything() {
-  await window.TrackerService.wipeEverything();
+  return window.TrackerService.wipeEverything();
 }
 
-/* ---------- tabs ---------- */
+function handlePhotoUpload(file) {
+  return window.AppView.handlePhotoUpload(file);
+}
+
 function switchTab(tab) {
-  state.activeTab = tab;
-  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.add('hidden'));
-  document.getElementById('tab-' + tab).classList.remove('hidden');
-  document.querySelectorAll('.nav-btn').forEach((b) => {
-    b.classList.toggle('active', b.dataset.tab === tab);
-  });
+  window.AppView.switchTab(tab);
 }
-
-/* ---------- wire up events ---------- */
-/* UI wiring moved to `controllers/appController.js` (AppController.init) */
 
 /* ---------- test helpers (dev only) ---------- */
 // Simulate marking all tasks and adding a photo for a day, then log results.
