@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#16181C" />
+<title>75 · Streak Card</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ONBOARDING -->
+  <section id="onboard" class="screen hidden">
+    <div class="onboard-wrap">
+      <p class="eyebrow">choose your run</p>
+      <h1 class="onboard-title">Pick a difficulty</h1>
+      <div id="tierCards" class="tier-cards"></div>
+      <button id="startBtn" class="btn-primary" disabled>Start Day 1</button>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <main id="app" class="screen hidden">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <p class="eyebrow" id="tierEyebrow">hard mode</p>
+        <h1 class="daycount"><span id="dayNum">1</span><span class="daycount-of">/75</span></h1>
+      </div>
+      <div class="topbar-right">
+        <div class="streak-pill" id="streakPill">
+          <span id="streakNum">0</span>
+          <span class="streak-label">day streak</span>
+        </div>
+        <button id="settingsBtn" class="icon-btn" aria-label="Settings">⋮</button>
+      </div>
+    </header>
+
+    <!-- Chain / punch card -->
+    <div class="chain-wrap">
+      <div id="chain" class="chain"></div>
+    </div>
+
+    <!-- FAIL BANNER -->
+    <div id="failBanner" class="fail-banner hidden">
+      <p><strong id="failDay"></strong> was missed. The run resets.</p>
+      <button id="restartBtn" class="btn-restart">Restart at Day 1</button>
+    </div>
+
+    <!-- TAB: TODAY -->
+    <section id="tab-today" class="tab-panel">
+      <ul id="taskList" class="task-list"></ul>
+
+      <div class="photo-card">
+        <div class="photo-card-head">
+          <p class="photo-card-title">Progress photo</p>
+          <p class="photo-card-sub" id="photoStatus">Not taken yet</p>
+        </div>
+        <label class="photo-slot" id="photoSlot">
+          <img id="photoPreview" class="hidden" alt="Today's progress photo" />
+          <span id="photoPlaceholder" class="photo-placeholder">＋ Add photo</span>
+          <input type="file" accept="image/*" capture="environment" id="photoInput" class="visually-hidden" />
+        </label>
+      </div>
+    </section>
+
+    <!-- TAB: PROGRESS (calendar grid + detail) -->
+    <section id="tab-progress" class="tab-panel hidden">
+      <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <!-- TAB: GALLERY -->
+    <section id="tab-gallery" class="tab-panel hidden">
+      <div id="galleryGrid" class="gallery-grid"></div>
+      <p id="galleryEmpty" class="empty-note hidden">No photos yet. They'll collect here as you go.</p>
+    </section>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="today">
+        <span class="nav-icon">✓</span><span>Today</span>
+      </button>
+      <button class="nav-btn" data-tab="progress">
+        <span class="nav-icon">▦</span><span>Progress</span>
+      </button>
+      <button class="nav-btn" data-tab="gallery">
+        <span class="nav-icon">◱</span><span>Photos</span>
+      </button>
+    </nav>
+  </main>
+
+  <!-- DAY DETAIL MODAL -->
+  <div id="dayModal" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeModal" class="modal-close" aria-label="Close">×</button>
+      <p class="eyebrow" id="modalDay">Day 1</p>
+      <p class="modal-date" id="modalDate"></p>
+      <img id="modalPhoto" class="modal-photo hidden" alt="Progress photo" />
+      <ul id="modalTasks" class="modal-tasks"></ul>
+    </div>
+  </div>
+
+  <!-- SETTINGS SHEET -->
+  <div id="settingsSheet" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeSettings" class="modal-close" aria-label="Close">×</button>
+      <p class="eyebrow">settings</p>
+      <p class="modal-date" id="settingsMeta"></p>
+      <button id="switchTierBtn" class="btn-secondary">Change difficulty (restarts run)</button>
+      <button id="wipeBtn" class="btn-danger">Erase all data</button>
+    </div>
+  </div>
+
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

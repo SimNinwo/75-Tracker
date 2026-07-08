@@ -1,0 +1,15 @@
+{
+  "name": "75 · Streak Card",
+  "short_name": "75 Streak",
+  "description": "A 75-day Hard, Medium, or Easy challenge tracker with daily checklists and progress photos.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#16181C",
+  "theme_color": "#16181C",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
