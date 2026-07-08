@@ -45,16 +45,12 @@ const TIERS = {
   },
 };
 
-let state = {
-  tier: null,
-  startDate: null,
-  status: 'active', // active | failed | completed
-  currentDay: 1,
-  todayRecord: null,
-  todayPhotoUrl: null,
-  activeTab: 'today',
-  failedAtDay: null,
-};
+// Expose to window for services to access
+window.TOTAL_DAYS = TOTAL_DAYS;
+window.TIERS = TIERS;
+
+const StateManager = window.StateManager;
+const state = StateManager.getState();
 
 /* ---------- date helpers ---------- */
 function dateOnly(d) {
@@ -369,60 +365,7 @@ function switchTab(tab) {
 }
 
 /* ---------- wire up events ---------- */
-window.addEventListener('DOMContentLoaded', () => {
-  boot();
-
-  document.getElementById('startBtn').addEventListener('click', (e) => {
-    const tier = e.target.dataset.tier;
-    if (tier) startRun(tier);
-  });
-
-  document.getElementById('restartBtn').addEventListener('click', () => {
-    if (confirm('This clears all logged days and photos and restarts at Day 1. Continue?')) {
-      restartRun();
-    }
-  });
-
-  document.getElementById('photoInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) handlePhotoUpload(file);
-  });
-
-  document.querySelectorAll('.nav-btn').forEach((btn) => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-
-  document.getElementById('closeModal').addEventListener('click', () => {
-    document.getElementById('dayModal').classList.add('hidden');
-  });
-  document.getElementById('dayModal').addEventListener('click', (e) => {
-    if (e.target.id === 'dayModal') e.target.classList.add('hidden');
-  });
-
-  document.getElementById('settingsBtn').addEventListener('click', () => {
-    document.getElementById('settingsMeta').textContent =
-      `${currentTier().label} mode · started ${dateOnly(state.startDate).toDateString()}`;
-    document.getElementById('settingsSheet').classList.remove('hidden');
-  });
-  document.getElementById('closeSettings').addEventListener('click', () => {
-    document.getElementById('settingsSheet').classList.add('hidden');
-  });
-  document.getElementById('settingsSheet').addEventListener('click', (e) => {
-    if (e.target.id === 'settingsSheet') e.target.classList.add('hidden');
-  });
-  document.getElementById('switchTierBtn').addEventListener('click', async () => {
-    if (confirm('Changing difficulty restarts your run at Day 1 and clears all logged data. Continue?')) {
-      await DB.clearAll();
-      document.getElementById('settingsSheet').classList.add('hidden');
-      showOnboarding();
-    }
-  });
-  document.getElementById('wipeBtn').addEventListener('click', () => {
-    if (confirm('This permanently erases every day, task, and photo. Continue?')) {
-      wipeEverything();
-    }
-  });
-});
+/* UI wiring moved to `controllers/appController.js` (AppController.init) */
 
 /* ---------- test helpers (dev only) ---------- */
 // Simulate marking all tasks and adding a photo for a day, then log results.

@@ -1,14 +1,12 @@
-/* trackerService.js — business logic / use-cases for the 75-Tracker app
-   Purpose: isolate date logic, completion rules and DB interactions from UI.
-   This is a minimal refactor that keeps browser globals but separates concerns.
-*/
+/* services/trackerService.js — business logic / use-cases for the 75-Tracker app */
 (function () {
-  const DB = window.TrackerRepository;
-  const TOTAL_DAYS = window.TOTAL_DAYS;
-  const TIERS = window.TIERS;
+  function getTIERS() { return window.TIERS; }
+  function getTOTAL_DAYS() { return window.TOTAL_DAYS; }
+  function getDB() { return window.TrackerRepository; }
+  function getStateManager() { return window.StateManager; }
 
   function currentTier() {
-    return TIERS[window.state.tier];
+    return getTIERS()[getStateManager().getState().tier];
   }
 
   function dateOnly(d) {
@@ -31,7 +29,7 @@
   }
 
   function dateForDay(dayNum) {
-    const d = dateOnly(window.state.startDate);
+    const d = dateOnly(getStateManager().getState().startDate);
     d.setDate(d.getDate() + (dayNum - 1));
     return d;
   }
@@ -43,11 +41,11 @@
   }
 
   async function isDayComplete(dayNum) {
-    const rec = await DB.getDay(dayNum);
+    const rec = await getDB().getDay(dayNum);
     const tier = currentTier();
     for (const task of tier.tasks) {
       if (task.id === 'photo') {
-        const photo = await DB.getPhoto(dayNum);
+        const photo = await getDB().getPhoto(dayNum);
         if (!photo) return false;
       } else if (!rec || !rec.tasks[task.id]) {
         return false;
@@ -58,18 +56,19 @@
 
   async function recomputeStatus() {
     const today = new Date();
-    const rawDayIndex = daysBetween(window.state.startDate, today) + 1;
-    const dayIndex = Math.min(rawDayIndex, TOTAL_DAYS + 1);
+    const s = getStateManager().getState();
+    const rawDayIndex = daysBetween(s.startDate, today) + 1;
+    const dayIndex = Math.min(rawDayIndex, getTOTAL_DAYS() + 1);
 
-    if (window.state.status === 'active') {
+    if (s.status === 'active') {
       for (let d = 1; d < dayIndex; d++) {
         const complete = await isDayComplete(d);
         if (!complete) {
           if (currentTier().restartOnMiss) {
-            window.state.status = 'failed';
-            window.state.failedAtDay = d;
-            await DB.setMeta('settings', {
-              tier: window.state.tier, startDate: window.state.startDate,
+            s.status = 'failed';
+            s.failedAtDay = d;
+            await getDB().setMeta('settings', {
+              tier: s.tier, startDate: s.startDate,
               status: 'failed', failedAtDay: d,
             });
             break;
@@ -78,18 +77,19 @@
       }
     }
 
-    if (window.state.status === 'active' && rawDayIndex > TOTAL_DAYS) {
-      window.state.status = 'completed';
-      await DB.setMeta('settings', {
-        tier: window.state.tier, startDate: window.state.startDate, status: 'completed',
+    if (s.status === 'active' && rawDayIndex > getTOTAL_DAYS()) {
+      s.status = 'completed';
+      await getDB().setMeta('settings', {
+        tier: s.tier, startDate: s.startDate, status: 'completed',
       });
     }
 
-    window.state.currentDay = Math.min(Math.max(rawDayIndex, 1), TOTAL_DAYS);
+    s.currentDay = Math.min(Math.max(rawDayIndex, 1), getTOTAL_DAYS());
   }
 
   async function computeStreak() {
-    const upTo = window.state.status === 'failed' ? window.state.failedAtDay - 1 : window.state.currentDay;
+    const s = getStateManager().getState();
+    const upTo = s.status === 'failed' ? s.failedAtDay - 1 : s.currentDay;
     let streak = 0;
     for (let d = upTo; d >= 1; d--) {
       const complete = await isDayComplete(d);
@@ -101,20 +101,21 @@
 
   async function startRun(tier) {
     const startDate = isoDateOnly(new Date());
-    await DB.setMeta('settings', { tier, startDate, status: 'active' });
-    window.state.tier = tier;
-    window.state.startDate = startDate;
-    window.state.status = 'active';
-    window.state.failedAtDay = null;
+    await getDB().setMeta('settings', { tier, startDate, status: 'active' });
+    const s = getStateManager().getState();
+    s.tier = tier;
+    s.startDate = startDate;
+    s.status = 'active';
+    s.failedAtDay = null;
   }
 
   async function restartRun() {
-    await DB.clearAll();
-    await startRun(window.state.tier);
+    await getDB().clearAll();
+    await startRun(getStateManager().getState().tier);
   }
 
   async function wipeEverything() {
-    await DB.clearAll();
+    await getDB().clearAll();
     location.reload();
   }
 
