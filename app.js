@@ -58,25 +58,16 @@ let state = {
 
 /* ---------- date helpers ---------- */
 function dateOnly(d) {
-  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-    const [year, month, day] = d.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  }
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  return window.TrackerService.dateOnly(d);
 }
 function isoDateOnly(d) {
-  const x = dateOnly(d);
-  return `${x.getFullYear().toString().padStart(4, '0')}-${(x.getMonth() + 1).toString().padStart(2, '0')}-${x.getDate().toString().padStart(2, '0')}`;
+  return window.TrackerService.isoDateOnly(d);
 }
 function daysBetween(a, b) {
-  return Math.round((dateOnly(b) - dateOnly(a)) / 86400000);
+  return window.TrackerService.daysBetween(a, b);
 }
 function dateForDay(dayNum) {
-  const d = dateOnly(state.startDate);
-  d.setDate(d.getDate() + (dayNum - 1));
-  return d;
+  return window.TrackerService.dateForDay(dayNum);
 }
 
 function currentTier() {
@@ -84,23 +75,11 @@ function currentTier() {
 }
 
 function emptyTasks() {
-  const t = {};
-  currentTier().tasks.forEach((task) => { t[task.id] = false; });
-  return t;
+  return window.TrackerService.emptyTasks();
 }
 
 async function isDayComplete(dayNum) {
-  const rec = await DB.getDay(dayNum);
-  const tier = currentTier();
-  for (const task of tier.tasks) {
-    if (task.id === 'photo') {
-      const photo = await DB.getPhoto(dayNum);
-      if (!photo) return false;
-    } else if (!rec || !rec.tasks[task.id]) {
-      return false;
-    }
-  }
-  return true;
+  return window.TrackerService.isDayComplete(dayNum);
 }
 
 /* ---------- boot ---------- */
@@ -147,47 +126,11 @@ function hexToRgba(hex, a) {
 
 /* ---------- status / streak logic ---------- */
 async function recomputeStatus() {
-  const today = new Date();
-  const rawDayIndex = daysBetween(state.startDate, today) + 1;
-  const dayIndex = Math.min(rawDayIndex, TOTAL_DAYS + 1);
-
-  if (state.status === 'active') {
-    for (let d = 1; d < dayIndex; d++) {
-      const complete = await isDayComplete(d);
-      if (!complete) {
-        if (currentTier().restartOnMiss) {
-          state.status = 'failed';
-          state.failedAtDay = d;
-          await DB.setMeta('settings', {
-            tier: state.tier, startDate: state.startDate,
-            status: 'failed', failedAtDay: d,
-          });
-          break;
-        }
-        // easy tier: keep going, just mark that day as missed (no record write needed)
-      }
-    }
-  }
-
-  if (state.status === 'active' && rawDayIndex > TOTAL_DAYS) {
-    state.status = 'completed';
-    await DB.setMeta('settings', {
-      tier: state.tier, startDate: state.startDate, status: 'completed',
-    });
-  }
-
-  state.currentDay = Math.min(Math.max(rawDayIndex, 1), TOTAL_DAYS);
+  return window.TrackerService.recomputeStatus();
 }
 
 async function computeStreak() {
-  const upTo = state.status === 'failed' ? state.failedAtDay - 1 : state.currentDay;
-  let streak = 0;
-  for (let d = upTo; d >= 1; d--) {
-    const complete = await isDayComplete(d);
-    if (complete) streak++;
-    else break;
-  }
-  return streak;
+  return window.TrackerService.computeStreak();
 }
 
 /* ---------- rendering ---------- */
@@ -402,23 +345,17 @@ function renderTierCards() {
 }
 
 async function startRun(tier) {
-  const startDate = isoDateOnly(new Date());
-  await DB.setMeta('settings', { tier, startDate, status: 'active' });
-  state.tier = tier;
-  state.startDate = startDate;
-  state.status = 'active';
-  state.failedAtDay = null;
+  await window.TrackerService.startRun(tier);
   showApp();
 }
 
 async function restartRun() {
-  await DB.clearAll();
-  await startRun(state.tier);
+  await window.TrackerService.restartRun();
+  showApp();
 }
 
 async function wipeEverything() {
-  await DB.clearAll();
-  location.reload();
+  await window.TrackerService.wipeEverything();
 }
 
 /* ---------- tabs ---------- */
