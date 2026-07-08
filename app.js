@@ -58,18 +58,23 @@ let state = {
 
 /* ---------- date helpers ---------- */
 function dateOnly(d) {
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 }
 function isoDateOnly(d) {
-  return dateOnly(d).toISOString().slice(0, 10);
+  const x = dateOnly(d);
+  return `${x.getFullYear().toString().padStart(4, '0')}-${(x.getMonth() + 1).toString().padStart(2, '0')}-${x.getDate().toString().padStart(2, '0')}`;
 }
 function daysBetween(a, b) {
   return Math.round((dateOnly(b) - dateOnly(a)) / 86400000);
 }
 function dateForDay(dayNum) {
-  const d = new Date(state.startDate);
+  const d = dateOnly(state.startDate);
   d.setDate(d.getDate() + (dayNum - 1));
   return d;
 }
@@ -450,7 +455,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('settingsMeta').textContent =
-      `${currentTier().label} mode · started ${new Date(state.startDate).toDateString()}`;
+      `${currentTier().label} mode · started ${dateOnly(state.startDate).toDateString()}`;
     document.getElementById('settingsSheet').classList.remove('hidden');
   });
   document.getElementById('closeSettings').addEventListener('click', () => {
