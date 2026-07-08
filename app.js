@@ -79,10 +79,41 @@ async function isDayComplete(dayNum) {
 }
 
 /* ---------- boot ---------- */
-async function boot() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+let serviceWorkerRefreshing = false;
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (serviceWorkerRefreshing) return;
+    serviceWorkerRefreshing = true;
+    window.location.reload();
+  });
+
+  try {
+    const registration = await navigator.serviceWorker.register('sw.js');
+    if (registration.waiting) {
+      console.log('Service worker waiting to activate. Refreshing page now.');
+      window.location.reload();
+    }
+
+    registration.addEventListener('updatefound', () => {
+      const installingWorker = registration.installing;
+      if (!installingWorker) return;
+      installingWorker.addEventListener('statechange', () => {
+        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          console.log('New service worker installed. Refreshing page.');
+          window.location.reload();
+        }
+      });
+    });
+  } catch (err) {
+    console.warn('Service worker registration failed', err);
   }
+}
+
+async function boot() {
+  await registerServiceWorker();
 
   const settings = await DB.getMeta('settings');
   if (!settings) {
