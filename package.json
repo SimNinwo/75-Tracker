@@ -1,0 +1,11 @@
+{
+  "name": "75-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "e2e": "node tests/e2e/run.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.43.0"
+  }
+}

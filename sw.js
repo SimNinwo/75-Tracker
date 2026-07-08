@@ -1,4 +1,4 @@
-const CACHE_NAME = '75-tracker-v1.1.2';
+const CACHE_NAME = '75-tracker-v1.2';
 const ASSETS = [
   './',
   './index.html',
@@ -24,8 +24,15 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (!event.data || event.data.type !== 'SKIP_WAITING') return;
+  self.skipWaiting();
+});
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Skip non-http(s) requests (e.g., chrome-extension://)
+  if (!event.request.url.startsWith('http')) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
