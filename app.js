@@ -157,10 +157,29 @@ async function renderChain() {
   for (let d = 1; d <= TOTAL_DAYS; d++) {
     const cell = document.createElement('div');
     cell.className = 'chain-cell';
+    const isToday = d === state.currentDay && state.status === 'active';
+    const complete = await isDayComplete(d);
+    
     if (d < state.currentDay || (d === state.currentDay && state.status !== 'active')) {
-      const complete = await isDayComplete(d);
+      // Past or failed day
       cell.classList.add(complete ? 'done' : 'missed');
-    } else if (d === state.currentDay && state.status === 'active') {
+      if (complete) {
+        const rec = await window.TrackerRepository.getDay(d);
+        if (rec && rec.completed) {
+          cell.classList.add('completed-badge');
+          cell.setAttribute('title', 'All tasks & photo completed');
+        }
+      }
+    } else if (isToday && complete) {
+      // Today AND all tasks are complete
+      cell.classList.add('done');
+      const rec = await window.TrackerRepository.getDay(d);
+      if (rec && rec.completed) {
+        cell.classList.add('completed-badge');
+        cell.setAttribute('title', 'All tasks & photo completed');
+      }
+    } else if (isToday) {
+      // Today but not yet complete
       cell.classList.add('today');
     }
     chain.appendChild(cell);
@@ -246,13 +265,17 @@ async function renderCalendar() {
     const cell = document.createElement('button');
     cell.className = 'cal-cell';
     cell.textContent = d;
-    if (d > state.currentDay || (d === state.currentDay && state.status === 'active')) {
+    const isToday = d === state.currentDay && state.status === 'active';
+    const complete = await isDayComplete(d);
+    
+    if (d > state.currentDay || (isToday && !complete)) {
+      // Future days or today (incomplete)
       if (d === state.currentDay) cell.classList.add('today');
       else cell.classList.add('future');
     } else {
-      const complete = await isDayComplete(d);
+      // Past days OR today (complete)
       cell.classList.add(complete ? 'done' : 'missed');
-      const photo = await DB.getPhoto(d);
+      const photo = await window.TrackerRepository.getPhoto(d);
       if (photo) {
         const dot = document.createElement('span');
         dot.className = 'dot';
@@ -398,3 +421,18 @@ async function runCompletionTest(day = state.currentDay) {
 }
 
 window.runCompletionTest = runCompletionTest;
+
+/* ---------- debug helpers ---------- */
+async function debugCheckDay(dayNum = state.currentDay) {
+  const rec = await window.TrackerRepository.getDay(dayNum);
+  const photo = await window.TrackerRepository.getPhoto(dayNum);
+  const isComplete = await isDayComplete(dayNum);
+  console.log(`Day ${dayNum}:`, {
+    record: rec,
+    hasPhoto: !!photo,
+    isDayComplete: isComplete,
+    recCompleted: rec?.completed || null,
+  });
+  return { record: rec, hasPhoto: !!photo, isDayComplete: isComplete, recCompleted: rec?.completed };
+}
+window.debugCheckDay = debugCheckDay;

@@ -283,6 +283,34 @@ button:focus-visible, a:focus-visible, label:focus-within{
   position:absolute; bottom:6px; width:5px; height:5px; border-radius:50%;
   background:var(--accent);
 }
+.cal-cell.completed-badge{
+  border:2px solid var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.cal-cell.completed-badge::after{
+  content:"✓";
+  position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  font-size:18px; font-weight:900; color:var(--accent); z-index:10;
+}
+.chain-cell{
+  aspect-ratio:1;
+  border-radius:3px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  position:relative;
+}
+.chain-cell.done{ background:var(--accent); border-color:var(--accent); }
+.chain-cell.missed{ background:transparent; border:1px dashed var(--danger); }
+.chain-cell.today{ box-shadow: 0 0 0 2px var(--paper) inset; }
+.chain-cell.completed-badge{
+  box-shadow: inset 0 0 0 1px var(--paper), 0 0 0 1px var(--accent);
+}
+.chain-cell.completed-badge::after{
+  content:"✓";
+  position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+  font-size:10px; color:var(--paper); font-weight:900;
+  z-index:10;
+}
 
 /* ---------- GALLERY ---------- */
 .gallery-grid{
