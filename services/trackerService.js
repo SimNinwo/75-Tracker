@@ -9,6 +9,16 @@
     return getTIERS()[getStateManager().getState().tier];
   }
 
+  // Return the effective task list for the current tier, taking into account
+  // any user-customized tasks persisted in state.customTasks.
+  function effectiveTasks() {
+    const s = getStateManager().getState();
+    const base = getTIERS()[s.tier].tasks || [];
+    const custom = (s.customTasks && s.customTasks[s.tier]);
+    if (Array.isArray(custom) && custom.length > 0) return custom;
+    return base;
+  }
+
   function dateOnly(d) {
     if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
       const [year, month, day] = d.split('-').map(Number);
@@ -36,14 +46,13 @@
 
   function emptyTasks() {
     const t = {};
-    currentTier().tasks.forEach((task) => { t[task.id] = false; });
+    effectiveTasks().forEach((task) => { t[task.id] = false; });
     return t;
   }
 
   async function isDayComplete(dayNum) {
     const rec = await getDB().getDay(dayNum);
-    const tier = currentTier();
-    for (const task of tier.tasks) {
+    for (const task of effectiveTasks()) {
       if (task.id === 'photo') {
         const photo = await getDB().getPhoto(dayNum);
         if (!photo) return false;

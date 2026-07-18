@@ -9,6 +9,15 @@
       return window.TIERS[this.state.tier];
     }
 
+    // Return the effective task list for the current tier, honoring any
+    // user-customized tasks stored in state.customTasks (overrides defaults).
+    getTaskList() {
+      const base = this.currentTier().tasks || [];
+      const custom = (this.state.customTasks && this.state.customTasks[this.state.tier]);
+      if (Array.isArray(custom) && custom.length > 0) return custom;
+      return base;
+    }
+
     hexToRgba(hex, a) {
       const r = parseInt(hex.slice(1, 3), 16);
       const g = parseInt(hex.slice(3, 5), 16);
@@ -91,7 +100,7 @@
       }
       this.state.todayRecord = rec;
 
-      this.currentTier().tasks.filter((t) => t.id !== 'photo').forEach((task) => {
+      this.getTaskList().filter((t) => t.id !== 'photo').forEach((task) => {
         const li = document.createElement('li');
         li.className = 'task-item' + (rec.tasks[task.id] ? ' checked' : '');
         li.dataset.taskId = task.id;
@@ -188,7 +197,7 @@
 
       const list = document.getElementById('modalTasks');
       list.innerHTML = '';
-      this.currentTier().tasks.forEach((task) => {
+      this.getTaskList().forEach((task) => {
         const li = document.createElement('li');
         let done;
         if (task.id === 'photo') done = !!photo;
@@ -244,6 +253,88 @@
         });
         wrap.appendChild(card);
       });
+    }
+
+    // Render the tasks editor inside Settings. Allows adding/removing up to 7 tasks (photo excluded).
+    renderSettingsTasks() {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <div style="margin:12px 0">
+          <strong>Customize tasks</strong>
+          <div id="settingsTasksList" style="margin-top:8px"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input id="settingsTaskInput" placeholder="New task label" style="flex:1;padding:6px" />
+            <button id="addSettingsTask" class="btn-primary">Add</button>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">You may create up to 7 tasks (photo excluded). For yearly mode, you may replace defaults.</p>
+        </div>
+      `;
+      const container = document.getElementById('settingsSheet').querySelector('.modal-card');
+      // remove existing custom section if present
+      const existing = document.getElementById('settingsTasks');
+      if (existing) existing.remove();
+      const holder = document.createElement('div');
+      holder.id = 'settingsTasks';
+      holder.appendChild(wrap);
+      container.insertBefore(holder, container.querySelector('#switchTierBtn'));
+
+      const listEl = holder.querySelector('#settingsTasksList');
+
+      const tasks = this.getTaskList().filter((t) => t.id !== 'photo');
+      function renderList() {
+        listEl.innerHTML = '';
+        tasks.forEach((t, i) => {
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.justifyContent = 'space-between';
+          row.style.alignItems = 'center';
+          row.style.padding = '6px 0';
+          row.innerHTML = `<span>${t.label}</span>`;
+          const del = document.createElement('button');
+          del.textContent = 'Remove';
+          del.className = 'btn-secondary';
+          del.addEventListener('click', async () => {
+            // remove by updating state.customTasks for this tier
+            const s = window.StateManager.getState();
+            s.customTasks = s.customTasks || {};
+            const current = s.customTasks[s.tier] ? s.customTasks[s.tier].slice() : this.getTaskList().slice();
+            current.splice(i, 1);
+            s.customTasks[s.tier] = current;
+            await window.TrackerRepository.setMeta('customTasks', s.customTasks);
+            this.state.customTasks = s.customTasks;
+            renderList.call(this);
+            await this.renderAll();
+          });
+          row.appendChild(del);
+          listEl.appendChild(row);
+        });
+      }
+
+      const addBtn = holder.querySelector('#addSettingsTask');
+      const input = holder.querySelector('#settingsTaskInput');
+      addBtn.addEventListener('click', async () => {
+        const label = input.value && input.value.trim();
+        if (!label) return;
+        const s = window.StateManager.getState();
+        s.customTasks = s.customTasks || {};
+        const current = s.customTasks[s.tier] ? s.customTasks[s.tier].slice() : this.getTaskList().filter((t) => t.id !== 'photo').slice();
+        if (current.length >= 7) {
+          alert('Maximum of 7 tasks (photo excluded) reached');
+          return;
+        }
+        // generate a simple id
+        const id = 'custom_' + Date.now();
+        current.push({ id, label });
+        // ensure photo stays present
+        s.customTasks[s.tier] = current.concat([{ id: 'photo', label: 'Take a progress photo' }]);
+        await window.TrackerRepository.setMeta('customTasks', s.customTasks);
+        this.state.customTasks = s.customTasks;
+        input.value = '';
+        renderList.call(this);
+        await this.renderAll();
+      });
+
+      renderList.call(this);
     }
 
     async startRun(tier) {

@@ -1,6 +1,6 @@
 /* app.js — 75-day Hard / Medium / Easy tracker */
 
-const TOTAL_DAYS = 75;
+const TOTAL_DAYS = 365;
 
 const TIERS = {
   hard: {
@@ -14,6 +14,20 @@ const TIERS = {
       { id: 'water',    label: 'Drink 1 gallon (3.7L) of water' },
       { id: 'read',     label: 'Read 10 pages of non-fiction' },
       { id: 'photo',    label: 'Take a progress photo' },
+    ],
+    restartOnMiss: true,
+  },
+  yearly: {
+    label: 'Yearly Hard',
+    color: '#8B1E2D',
+    desc: 'A year-long challenge — 365 days. Default tasks mirror Medium but you can customize up to 7 tasks (photo excluded).',
+    // default: copy of medium tasks (kept minimal here; user can customize later)
+    tasks: [
+      { id: 'diet', label: 'Stick to your diet — one planned cheat meal per week' },
+      { id: 'workout1', label: '45-minute workout' },
+      { id: 'water', label: 'Drink 3L of water' },
+      { id: 'read', label: 'Read 10 pages' },
+      { id: 'photo', label: 'Take a progress photo' },
     ],
     restartOnMiss: true,
   },
@@ -124,6 +138,10 @@ async function boot() {
   state.startDate = settings.startDate;
   state.status = settings.status;
   state.failedAtDay = settings.failedAtDay || null;
+
+  // load any persisted custom tasks per tier (allows yearly customization)
+  const customTasks = await DB.getMeta('customTasks');
+  state.customTasks = customTasks || {};
 
   await recomputeStatus();
   await showApp();

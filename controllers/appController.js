@@ -31,10 +31,14 @@
       if (e.target.id === 'dayModal') e.target.classList.add('hidden');
     });
 
-    document.getElementById('settingsBtn').addEventListener('click', () => {
+    document.getElementById('settingsBtn').addEventListener('click', async () => {
       const s = StateManager.getState();
       document.getElementById('settingsMeta').textContent =
         `${currentTier().label} mode · started ${dateOnly(s.startDate).toDateString()}`;
+      // render the settings task editor if available
+      if (window.AppView && typeof window.AppView.renderSettingsTasks === 'function') {
+        window.AppView.renderSettingsTasks();
+      }
       document.getElementById('settingsSheet').classList.remove('hidden');
     });
     document.getElementById('closeSettings').addEventListener('click', () => {
